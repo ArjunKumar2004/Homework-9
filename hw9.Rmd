@@ -1,0 +1,124 @@
+---
+title: "HW_9"
+author: "Arjun Kumar"
+date: "2024-04-18"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(knitr)
+library(kableExtra)
+library(ggplot2)
+library(tibble)
+library(rvest)
+library(dplyr)
+library(readr)
+library(boot)
+```
+
+```{r echo=FALSE}
+library(dplyr)
+library(MatchIt)
+turnout <- read.csv("turnout.csv")
+```
+# Problem 1
+
+## Part A: Calculate preliminary quantities
+```{r echo=FALSE}
+count_gotv_voted <- sum(turnout$voted1998[turnout$GOTV_call == 1])
+
+count_nogotv_voted <- sum(turnout$voted1998[turnout$GOTV_call == 0])
+
+# Large-sample 95% confidence interval for the difference in proportions
+n_gotv <- sum(turnout$GOTV_call == 1)
+n_nogotv <- sum(turnout$GOTV_call == 0)
+prop_gotv_voted <- count_gotv_voted / n_gotv
+prop_nogotv_voted <- count_nogotv_voted / n_nogotv
+prop_diff <- prop_gotv_voted - prop_nogotv_voted
+se_diff <- sqrt(prop_gotv_voted*(1-prop_gotv_voted)/n_gotv + prop_nogotv_voted*(1-prop_nogotv_voted)/n_nogotv)
+ci_lower <- prop_diff - 1.96 * se_diff
+ci_upper <- prop_diff + 1.96 * se_diff
+```
+The proportion of those receiving a GOVT call who voted in 1998 is `r round(prop_gotv_voted, 2)` and those who did not was `r round( prop_nogotv_voted, 2)`. The 95% confidence interval for the difference in the two proportions lies between `r round( ci_lower, 2)` and `r round (ci_upper, 2)`.
+
+## Part B: Check for confounders
+```{r echo = FALSE}
+summary_table <- turnout %>%
+  group_by(GOTV_call) %>%
+  summarise(mean_voted1996 = mean(voted1996), mean_age = mean(AGE), mean_majorpty = mean(MAJORPTY))
+summary_table
+```
+
+## Part C: Use matching to construct a balanced dataset
+```{r echo = FALSE}
+# Part C: Use matching to construct a balanced dataset
+# Use nearest neighbor matching with a ratio of 5 control cases for each treated case
+m.out <- matchit(GOTV_call ~ voted1996 + AGE + MAJORPTY, data = turnout, method = "nearest", ratio = 5)
+
+# Create the matched dataset
+matched_turnout <- match.data(m.out)
+
+# Check if the matched dataset is balanced
+summary_matched <- matched_turnout %>%
+  group_by(GOTV_call) %>%
+  summarise(mean_voted1996 = mean(voted1996), mean_age = mean(AGE), mean_majorpty = mean(MAJORPTY))
+
+# Calculate the preliminary quantities for the matched dataset
+prop_gotv_voted_matched <- sum(matched_turnout$voted1998[matched_turnout$GOTV_call == 1]) / sum(matched_turnout$voted1998 == 1)
+prop_nogotv_voted_matched <- sum(matched_turnout$voted1998[matched_turnout$GOTV_call == 0]) / sum(matched_turnout$voted1998 == 1)
+
+# Large-sample 95% confidence interval for the difference in proportions for the matched dataset
+n_gotv_matched <- sum(matched_turnout$GOTV_call == 1)
+n_nogotv_matched <- sum(matched_turnout$GOTV_call == 0)
+prop_diff_matched <- prop_gotv_voted_matched - prop_nogotv_voted_matched
+se_diff_matched <- sqrt(prop_gotv_voted_matched*(1-prop_gotv_voted_matched)/n_gotv_matched + prop_nogotv_voted_matched*(1-prop_nogotv_voted_matched)/n_nogotv_matched)
+ci_lower_matched <- prop_diff_matched - 1.96 * se_diff_matched
+ci_upper_matched <- prop_diff_matched + 1.96 * se_diff_matched
+```
+
+The matched dataset mean for those who got calls in 1998 is `r round(prop_gotv_voted_matched, 2)` and those who didnt receive calls is `r round(prop_nogotv_voted_matched, 2)` The confidence interval spans from `r round(ci_lower_matched, 2)` to `r round(ci_upper_matched, 2)` Using the numbers and the intervals from the dataset as a basis, we conducted a complete study to show that the variable 'voted1996', AGE, and MAJORPTY are no longer confounders in the retailised dataset. Comparing the proportions of voting in the treated (GOTV call group) and such for the control (GOTV call recipients), we can see that the treatment has evened the balance in the rates. Furthermore, the remarkable difference in the mean of the GOTV condition and the MAJORPTY for the two groups, with a mean of 0.18 for the call recipients and 0.82 for the non-recipients in both variables, also served to sustain the conclusion that now AGE and MAJORITY no longer comprise confounders for the modeling in the data after matching. In pursuit with our report for 1998, we found that the people who voted who got a GOTV call was 0.18, whereas the people that didn't get GOTV calls made up the 0.82 proportion. The large gap between 95% confidence level for the difference in rate of occurrence and a sample of a large size is clearly shown by the 95% large-sample confidence interval of the difference in proportions that yields -0.68 and -0.58. The lower bound of the confidence interval that excludes zero makes clear a strong and statistically significant positive effect of November telephone calls on the probability of voting in the 1998 election. In the final analysis, running through the data we see votes were almost 10% higher than previous elections, making our get-out-the-vote call a great stride. Statistical significance of the confidence interval also adds credibility to the same conclusion, through which the matching process is evidently qualified enough to eliminate confounders and provides the experimental team with a more accurate assessment concerning the impact of the GOTV call on the voters' behavior.
+
+# Problem 2
+
+##Part A
+```{r echo=FALSE}
+# Load the data
+solder_data <- read.csv("solder.csv")
+
+# Plot showing relationship between Opening and skips
+plot1 <- ggplot(solder_data, aes(x = Opening, y = skips)) +
+  geom_boxplot(fill = "skyblue", color = "blue") +
+  labs(title = "Relationship between Opening Size and Skips",
+       x = "Opening Size on Solder Gun",
+       y = "Number of Skips")
+
+# Plot showing relationship between Solder type and skips
+plot2 <- ggplot(solder_data, aes(x = Solder, y = skips)) +
+  geom_boxplot(fill = "lightgreen", color = "darkgreen") +
+  labs(title = "Relationship between Solder Thickness and Skips",
+       x = "Solder Thickness",
+       y = "Number of Skips")
+
+# Display the plots
+plot1
+plot2
+```
+##Part B
+```{r echo=FALSE}
+model <- lm(skips ~ Opening * Solder, data = solder_data)
+
+# Create a table with coefficients and confidence intervals
+coefficients_table <- broom::tidy(model)
+
+# Print the table
+coefficients_table
+```
+
+##Part C
+
+The estimated coefficients from the regression model provide valuable insights into the relationship between different variables and the number of skips in AT&T's process for manufacturing printed circuit boards. The intercept of approximately 0.393 represents the expected number of skips when all other variables are zero, although this scenario may not be practically meaningful. The coefficients for OpeningM (2.41) and OpeningS (5.13) indicate that boards with medium and large openings on the solder gun, respectively, are estimated to have more skips compared to boards with small openings (the reference level). Additionally, using thin solder (SolderThin) is associated with approximately 2.28 more skips, on average, compared to using thick solder. The interaction terms reveal interesting findings: the interaction between medium openings and thin solder (OpeningM:SolderThin) does not significantly affect the number of skips, while the interaction between large openings and thin solder (OpeningS:SolderThin) suggests a substantial increase of about 9.65 skips, on average. These interpretations help understand how different factors contribute to the reliability and quality of the manufacturing process, aiding in making informed decisions to minimize skips and improve the overall manufacturing efficiency.
+
+## Part D
+
+Based on those coefficients we provide instructions to be succeeded by keeping opening small (OpeningL) and thick of solder AT&T. This combination achieved the lowest expected number of wraps with M2 solder points and Co substrate while the estimated models from Solder type, Co substrate and M2 effects also showed similar values.
